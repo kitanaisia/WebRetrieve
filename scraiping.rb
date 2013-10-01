@@ -2,10 +2,11 @@
 $KCODE="utf-8"
 
 require "extractcontent"
+require "uri"
 require "open-uri"
 require "nkf"
 #==========================================================================================
-# 【概要】
+# 【概要】 
 #   googleで指定クエリにより検索し，検索結果の各ページの内容を取得し，文字列の配列で返す．
 #   目標は，APIとほぼ同等の役割を果たすこと．
 #==========================================================================================
@@ -17,7 +18,8 @@ class WebSearcher
         @searchEngine = nil
 
         begin
-            if searchEngine.class == SearchEngine
+            # 引数searchEngineが，SearchEngineクラスを継承したものか判定
+            if searchEngine.class.ancestors.include?(SearchEngine)
                 @searchEngine = searchEngine
             else
                 raise "invalid_class_error"
@@ -28,26 +30,47 @@ class WebSearcher
     end
 
     # googleなり，yahooなりで検索して，その結果を返す
+    # http接続(yahooなど)のみ対応，https(googleなど)は現状非対応
     def retrieve(query, pageCount)
+        encoded_query = URI.escape(query)                               # クエリのエンコード
+        searchUrl = @searchEngine.createURL(encoded_query, pageCount)   # 検索エンジン毎に指定したフォーマットでURL作成
+        searchResult = open(searchUrl).read                             # 生成したURLで検索し，結果のHTMLを取得
+        resultUrlList = searchResult.scan(@searchEngine.searchPattern)  # 検索結果URLから，ヒットしたページのURLを取得
 
+        return resultUrlList
     end
 end
 
+# ======================================================================
+# 抽象クラス 検索エンジンを表す
+# コンストラクタと，createURLをオーバーライドすること
+# ======================================================================
 class SearchEngine
 
-    # def initialize
-        # @addressFormat = ""
-        # @searchPattern = ""
-    # end
+    def initialize
+        @addressFormat = ""
+        @searchPattern = ""
+    end
 
     def createURL(query)
         raise "abstract method is called!"
     end
+
+    # Getter
+    def addressFormat
+        return @addressFormat
+    end
+
+    def searchPattern
+        return @searchPattern
+    end
 end
 
+# Googleはhttps接続するため，このままでは動かないと思われる．
 class GoogleSearch < SearchEngine
     def initialize
-        @addressFormat = "https://www.google.com/#q=%s&start=%s"
+        @addressFormat = "https://www.google.com/?hl=ja#hl=ja&q=%s&start=%s"
+        @searchPattern = /<h3 class="r"><a href="(.*?)" onmousedown=.*?>/
     end
 
     def createURL(query, pageCount)
@@ -55,6 +78,27 @@ class GoogleSearch < SearchEngine
         return url
     end
 end
+
+class YahooSearch < SearchEngine
+    def initialize
+        @addressFormat = "http://search.yahoo.co.jp/search?p=%s&aq=-1&ei=UTF-8&pstart=1&fr=top_ga1_sa&b=%s"
+        @searchPattern = /<li><a href="(.*?)">/
+    end
+
+    def createURL(query, pageCount)
+        pagePalamater = (10 * pageCount.to_i) + 1                   # yahooは何番目のページから10個，という表示をする
+        url = sprintf(@addressFormat, query, pagePalamater.to_s)
+        return url
+    end
+end
+
+yahoo_search = YahooSearch.new
+searcher = WebSearcher.new(yahoo_search)
+query = "チャージマン研"
+urlList = searcher.retrieve(query, 1)
+urlList.each { |url| 
+    puts url
+}
 
 # 以下はネットからソースをダウンロードして，UTF8エンコードして返すプログラム
 # url = "http://www.google.co.jp"
