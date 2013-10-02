@@ -5,74 +5,31 @@ require "extractcontent"
 require "uri"
 require "open-uri"
 require "nkf"
-#==========================================================================================
-# 【概要】 
-#  指定検索エンジンで検索し，ヒットしたURLを返すためのクラス
-#  TODO:httpアクセス時のエラー処理(CustomNetクラス？)
-#==========================================================================================
-
-class WebSearcher
-    
-    # コンストラクタ
-    def initialize(searchEngine = nil)
-        @searchEngine = searchEngine
-    end
-
-    # googleなり，yahooなりで検索して，その結果を返す
-    # http接続(yahooなど)のみ対応，https(googleなど)は現状非対応
-    def retrieve(query, pageCount)
-        encoded_query = URI.escape(query)                                       # クエリのエンコード
-        searchUrl = @searchEngine.createURL(encoded_query, pageCount)           # 検索エンジン毎に指定したフォーマットでURL作成
-        searchResult = open(searchUrl).read                                     # 生成したURLで検索し，結果のHTMLを取得
-        resultUrlList = searchResult.scan(@searchEngine.searchPattern).flatten  # 検索結果URLから，ヒットしたページのURLを取得
-
-        return resultUrlList
-    end
-
-    # Getter
-    def searchEngine
-        return @searchEngine
-    end
-
-    # Setter
-    def searchEngine=(value)
-        begin
-            # 引数searchEngineが，SearchEngineクラスを継承したものか判定
-            if value.kind_of?(SearchEngine)
-                @searchEngine = value 
-            else
-                raise "invalid_class_error"
-            end
-        rescue
-            STDERR.puts "web検索エンジンが正しく設定されませんでした．検索エンジンを設定せずに処理を続けます．"
-        end
-    end
-
-    
-end
-
 # ======================================================================
-# 抽象クラス 検索エンジンを表す
-# コンストラクタと，createURLをオーバーライドすること
+# 検索エンジンを表すクラス
+# createUrl, getUrlListをオーバーライドすること
+#
+# createurl :URIエンコードした文字列とオフセットから，検索するURLを生成する関数
+# getUrlList:検索結果のHTMLから，欲しいURLを抽出し，配列で返す関数
 # ======================================================================
 class SearchEngine
 
-    def initialize
-        @addressFormat = ""
-        @searchPattern = ""
-    end
-
-    def createURL(query)
+    def createUrl(query, pageCount)
         raise "abstract method is called!"
     end
 
-    # Getter
-    def addressFormat
-        return @addressFormat
+    def getUrlList(html_source)
+        raise "abstract method is called!"
     end
 
-    def searchPattern
-        return @searchPattern
+    # http接続(yahooなど)のみ対応，https(googleなど)は現状非対応
+    def retrieve(query, pageCount)
+        encoded_query = URI.escape(query)                    # クエリのエンコード
+        searchUrl = self.createUrl(encoded_query, pageCount) # 検索エンジン毎に指定したフォーマットでURL作成
+        searchResult = open(searchUrl).read                  # 生成したURLで検索し，結果のHTMLを取得
+        resultUrlList = self.getUrlList(searchResult)        # 検索結果URLから，ヒットしたページのURLを取得
+
+        return resultUrlList
     end
 end
 
@@ -83,30 +40,36 @@ class GoogleSearch < SearchEngine
         @searchPattern = /<h3 class="r"><a href="(.*?)" onmousedown=.*?>/
     end
 
-    def createURL(query, pageCount)
+    def createUrl(query, pageCount)
         url = sprintf(@addressFormat, query, pageCount.to_s)
         return url
+    end
+
+    def getUrlList(html_source)
     end
 end
 
 class YahooSearch < SearchEngine
     def initialize
         @addressFormat = "http://search.yahoo.co.jp/search?p=%s&aq=-1&ei=UTF-8&pstart=1&fr=top_ga1_sa&b=%s"
-        @searchPattern = /<li><a href="(.*?)">/
+        @searchPattern = /((<\/h2><ol>)|(<\/em><\/li>))<li><a href="(.*?)">/
     end
 
-    def createURL(query, pageCount)
+    def createUrl(query, pageCount)
         pagePalamater = (10 * pageCount.to_i) + 1                   # yahooは何番目のページから10個，という表示をする
         url = sprintf(@addressFormat, query, pagePalamater.to_s)
         return url
     end
+
+    def getUrlList(html_source)
+        url_list = html_source.scan(@searchPattern).map{|match| match[3]}
+        return url_list
+    end
 end
 
+query = "プラナス・ガール"
 yahoo_search = YahooSearch.new
-searcher = WebSearcher.new(yahoo_search)
-query = "中二病でも恋がしたい"
-urlList = searcher.retrieve(query, 4)
-p urlList
+urlList = yahoo_search.retrieve(query, 4)
 urlList.each { |url| 
     encoded_contents = NKF.nkf("-w", open(url).read)
     body = ExtractContent::analyse(encoded_contents)   
