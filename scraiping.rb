@@ -7,20 +7,39 @@ require "open-uri"
 require "nkf"
 #==========================================================================================
 # 【概要】 
-#   googleで指定クエリにより検索し，検索結果の各ページの内容を取得し，文字列の配列で返す．
-#   目標は，APIとほぼ同等の役割を果たすこと．
+#  指定検索エンジンで検索し，ヒットしたURLを返すためのクラス
+#  TODO:httpアクセス時のエラー処理(CustomNetクラス？)
 #==========================================================================================
 
 class WebSearcher
     
     # コンストラクタ
-    def initialize(searchEngine)
-        @searchEngine = nil
+    def initialize(searchEngine = nil)
+        @searchEngine = searchEngine
+    end
 
+    # googleなり，yahooなりで検索して，その結果を返す
+    # http接続(yahooなど)のみ対応，https(googleなど)は現状非対応
+    def retrieve(query, pageCount)
+        encoded_query = URI.escape(query)                                       # クエリのエンコード
+        searchUrl = @searchEngine.createURL(encoded_query, pageCount)           # 検索エンジン毎に指定したフォーマットでURL作成
+        searchResult = open(searchUrl).read                                     # 生成したURLで検索し，結果のHTMLを取得
+        resultUrlList = searchResult.scan(@searchEngine.searchPattern).flatten  # 検索結果URLから，ヒットしたページのURLを取得
+
+        return resultUrlList
+    end
+
+    # Getter
+    def searchEngine
+        return @searchEngine
+    end
+
+    # Setter
+    def searchEngine=(value)
         begin
             # 引数searchEngineが，SearchEngineクラスを継承したものか判定
-            if searchEngine.class.ancestors.include?(SearchEngine)
-                @searchEngine = searchEngine
+            if value.kind_of?(SearchEngine)
+                @searchEngine = value 
             else
                 raise "invalid_class_error"
             end
@@ -29,16 +48,7 @@ class WebSearcher
         end
     end
 
-    # googleなり，yahooなりで検索して，その結果を返す
-    # http接続(yahooなど)のみ対応，https(googleなど)は現状非対応
-    def retrieve(query, pageCount)
-        encoded_query = URI.escape(query)                               # クエリのエンコード
-        searchUrl = @searchEngine.createURL(encoded_query, pageCount)   # 検索エンジン毎に指定したフォーマットでURL作成
-        searchResult = open(searchUrl).read                             # 生成したURLで検索し，結果のHTMLを取得
-        resultUrlList = searchResult.scan(@searchEngine.searchPattern)  # 検索結果URLから，ヒットしたページのURLを取得
-
-        return resultUrlList
-    end
+    
 end
 
 # ======================================================================
@@ -94,10 +104,14 @@ end
 
 yahoo_search = YahooSearch.new
 searcher = WebSearcher.new(yahoo_search)
-query = "チャージマン研"
-urlList = searcher.retrieve(query, 1)
+query = "中二病でも恋がしたい"
+urlList = searcher.retrieve(query, 4)
+p urlList
 urlList.each { |url| 
-    puts url
+    encoded_contents = NKF.nkf("-w", open(url).read)
+    body = ExtractContent::analyse(encoded_contents)   
+    puts body
+    puts "======================================================================"
 }
 
 # 以下はネットからソースをダウンロードして，UTF8エンコードして返すプログラム
