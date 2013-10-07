@@ -40,9 +40,7 @@ class SearchEngine
         search_result = @web_client.secureOpen(search_url).read # 生成したURLで検索し，結果のHTMLを取得
         result_url_list = self.getUrlList(search_result)        # 検索結果URLから，ヒットしたページのURLを取得
 
-        return result_url_list
-    end
-end
+        return result_url_list end end
 
 # Googleはhttps接続するため，このままでは動かないと思われる．
 class GoogleSearch < SearchEngine
@@ -86,7 +84,8 @@ class WebClient
     # LIMIT_CONTINUOUS_ERROR = 5
     WAIT_RETRY = 10000
     WAIT_RETRIEVE = 3000
-    ERROR_SKIP_MESSAGE = ["404 Not Found"]
+    ERROR_SKIP_MESSAGE = ["404 Not Found", 
+                          "403 Forbidden"]
 
     def initialize
         @continuous_retry_count
@@ -94,7 +93,7 @@ class WebClient
 
     # エラー処理は，現状やっつけ仕事
     def secureOpen(url)
-        html_source = ""
+        html_source = nil
         @continuous_retry_count = 0
 
         begin
@@ -141,7 +140,7 @@ class WebClient
     def isSkip(error)
         is_skip = false
 
-        self.ERROR_SKIP_MESSAGE.each { |skip_message| 
+        ERROR_SKIP_MESSAGE.each { |skip_message| 
             if error.message == skip_message
                 is_skip = true
             end
@@ -155,12 +154,15 @@ query = "プラナス・ガール"
 web_client = WebClient.new
 yahoo_search = YahooSearch.new
 yahoo_search.web_client = web_client
-urlList = yahoo_search.retrieve(query, 0)
+urlList = yahoo_search.retrieve(query, 5)
 urlList.each { |url| 
-    encoded_contents = NKF.nkf("-w", open(url).read)
-    body = ExtractContent::analyse(encoded_contents)   
-    puts body
-    puts "======================================================================"
+    http = web_client.secureOpen(url)
+    if http != nil
+        encoded_contents = NKF.nkf("-w", http.read)
+        body = ExtractContent::analyse(encoded_contents)   
+        puts body
+        puts "======================================================================"
+    end
 }
 
 # 以下はネットからソースをダウンロードして，UTF8エンコードして返すプログラム
