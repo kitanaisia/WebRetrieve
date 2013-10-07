@@ -5,6 +5,10 @@ require "extractcontent"
 require "uri"
 require "open-uri"
 require "nkf"
+require "socket"
+
+# TODO:CustomNetClientを作る
+
 # ======================================================================
 # 検索エンジンを表すクラス
 # createUrl, getUrlListをオーバーライドすること
@@ -22,14 +26,21 @@ class SearchEngine
         raise "abstract method is called!"
     end
 
+    def web_client=(value) 
+        if value.instance_of?(WebClient)
+            @web_client = value
+        end
+    end
+
     # http接続(yahooなど)のみ対応，https(googleなど)は現状非対応
     def retrieve(query, pageCount)
-        encoded_query = URI.escape(query)                    # クエリのエンコード
-        searchUrl = self.createUrl(encoded_query, pageCount) # 検索エンジン毎に指定したフォーマットでURL作成
-        searchResult = open(searchUrl).read                  # 生成したURLで検索し，結果のHTMLを取得
-        resultUrlList = self.getUrlList(searchResult)        # 検索結果URLから，ヒットしたページのURLを取得
+        encoded_query = URI.escape(query)                       # クエリのエンコード
+        search_url = self.createUrl(encoded_query, pageCount)   # 検索エンジン毎に指定したフォーマットでURL作成
+        # search_result = open(search_url).read                 
+        search_result = @web_client.secureOpen(search_url).read # 生成したURLで検索し，結果のHTMLを取得
+        result_url_list = self.getUrlList(search_result)        # 検索結果URLから，ヒットしたページのURLを取得
 
-        return resultUrlList
+        return result_url_list
     end
 end
 
@@ -49,6 +60,7 @@ class GoogleSearch < SearchEngine
     end
 end
 
+# Yahoo検索のためのクラス
 class YahooSearch < SearchEngine
     def initialize
         @addressFormat = "http://search.yahoo.co.jp/search?p=%s&aq=-1&ei=UTF-8&pstart=1&fr=top_ga1_sa&b=%s"
@@ -67,9 +79,83 @@ class YahooSearch < SearchEngine
     end
 end
 
+# 本当は，エラー処理部分は別途クラス化するべき
+class WebClient
+
+    LIMIT_RETRY = 3
+    # LIMIT_CONTINUOUS_ERROR = 5
+    WAIT_RETRY = 10000
+    WAIT_RETRIEVE = 3000
+    ERROR_SKIP_MESSAGE = ["404 Not Found"]
+
+    def initialize
+        @continuous_retry_count
+    end
+
+    # エラー処理は，現状やっつけ仕事
+    def secureOpen(url)
+        html_source = ""
+        @continuous_retry_count = 0
+
+        begin
+            html_source = open(url)
+
+        # HTTPエラーコードが帰ってきた場合
+        rescue OpenURI::HTTPError => error
+            # エラーの種類によって場合分け
+            if isSkip(error)
+                self.skip
+            else
+                self.retry
+            end
+            
+        # ネットが繋がっていない，接続先サーバが見つからない場合
+        rescue SocketError
+            self.skip
+
+        # 上記以外のエラー
+        rescue StandardError=>error
+            self.retry
+
+        # サーバのタイムアウト
+        # StandardErrorクラスを継承していないため，別途rescueが必要
+        rescue Timeout::Error
+            self.retry
+        end
+
+        return html_source
+    end
+
+    def retry
+        if @continuous_retry_count < LIMIT_RETRY
+            @continuous_retry_count += 1
+            retry
+        # リトライ回数が上限を超えたとき，空白文字列を返す．
+        end
+    end
+
+    def skip
+        # 現状は，何もしない
+    end
+
+    def isSkip(error)
+        is_skip = false
+
+        self.ERROR_SKIP_MESSAGE.each { |skip_message| 
+            if error.message == skip_message
+                is_skip = true
+            end
+        }
+
+        return is_skip
+    end
+end
+
 query = "プラナス・ガール"
+web_client = WebClient.new
 yahoo_search = YahooSearch.new
-urlList = yahoo_search.retrieve(query, 4)
+yahoo_search.web_client = web_client
+urlList = yahoo_search.retrieve(query, 0)
 urlList.each { |url| 
     encoded_contents = NKF.nkf("-w", open(url).read)
     body = ExtractContent::analyse(encoded_contents)   
