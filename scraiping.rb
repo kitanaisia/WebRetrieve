@@ -33,30 +33,23 @@ class SearchEngine
     end
 
     # http接続(yahooなど)のみ対応，https(googleなど)は現状非対応
-    def retrieve(query, pageCount)
-        encoded_query = URI.escape(query)                       # クエリのエンコード
-        search_url = self.createUrl(encoded_query, pageCount)   # 検索エンジン毎に指定したフォーマットでURL作成
-        # search_result = open(search_url).read                 
+    def retrieve(pageCount, query)
+        # encoded_query = URI.escape(query)                       # クエリのエンコード
+        encoded_query = query.map{|each_query| URI.escape(each_query)}
+        search_url = self.createUrl(pageCount, encoded_query)   # 検索エンジン毎に指定したフォーマットでURL作成
         search_result = @web_client.secureOpen(search_url).read # 生成したURLで検索し，結果のHTMLを取得
         result_url_list = self.getUrlList(search_result)        # 検索結果URLから，ヒットしたページのURLを取得
 
         return result_url_list end end
 
 # Googleはhttps接続するため，このままでは動かないと思われる．
-class GoogleSearch < SearchEngine
-    def initialize
-        @addressFormat = "https://www.google.com/?hl=ja#hl=ja&q=%s&start=%s"
-        @searchPattern = /<h3 class="r"><a href="(.*?)" onmousedown=.*?>/
-    end
+# class GoogleSearch < SearchEngine
+    # def initialize
+        # @addressFormat = "https://www.google.com/?hl=ja#hl=ja&q=%s&start=%s"
+        # @searchPattern = /<h3 class="r"><a href="(.*?)" onmousedown=.*?>/
+    # end
 
-    def createUrl(query, pageCount)
-        url = sprintf(@addressFormat, query, pageCount.to_s)
-        return url
-    end
-
-    def getUrlList(html_source)
-    end
-end
+# end
 
 # Yahoo検索のためのクラス
 class YahooSearch < SearchEngine
@@ -65,9 +58,10 @@ class YahooSearch < SearchEngine
         @searchPattern = /((<\/h2><ol>)|(<\/em><\/li>))<li><a href="(.*?)">/
     end
 
-    def createUrl(query, pageCount)
-        pagePalamater = (10 * pageCount.to_i) + 1                   # yahooは何番目のページから10個，という表示をする
-        url = sprintf(@addressFormat, query, pagePalamater.to_s)
+    def createUrl(pageCount, query)
+        page_palamater = (10 * pageCount.to_i) + 1                   # yahooは何番目のページから10個，という表示をする
+        query_string = query.join("+")
+        url = sprintf(@addressFormat, query, page_palamater.to_s)
         return url
     end
 
@@ -81,7 +75,6 @@ end
 class WebClient
 
     LIMIT_RETRY = 3
-    # LIMIT_CONTINUOUS_ERROR = 5
     WAIT_RETRY = 10000
     WAIT_RETRIEVE = 3000
     ERROR_SKIP_MESSAGE = ["404 Not Found", 
@@ -91,11 +84,19 @@ class WebClient
         @continuous_retry_count
     end
 
-    # エラー処理は，現状やっつけ仕事
+    # ======================================================================
+    # 【概要】
+    # URLにアクセスし，HTMLオブジェクト(確か)を返す. 失敗した場合は，nilを返す．
+    # 【入力】
+    # url   String型，URL
+    # 【出力】
+    # html_source   アクセス成功時はHTMLオブジェクト，失敗時にはnil
+    # ======================================================================
     def secureOpen(url)
         html_source = nil
         @continuous_retry_count = 0
 
+        # エラー処理は，現状やっつけ仕事
         begin
             html_source = open(url)
 
@@ -113,7 +114,7 @@ class WebClient
             self.skip
 
         # 上記以外のエラー
-        rescue StandardError=>error
+        rescue StandardError
             self.retry
 
         # サーバのタイムアウト
@@ -125,6 +126,7 @@ class WebClient
         return html_source
     end
 
+    # 上記のsecureOpenにおけるリトライの動作
     def retry
         if @continuous_retry_count < LIMIT_RETRY
             @continuous_retry_count += 1
@@ -133,10 +135,12 @@ class WebClient
         end
     end
 
+    # 上記のsecureOpenにおけるスキップする際の動作
     def skip
         # 現状は，何もしない
     end
 
+    # エラーがスキップするべきものかを判定する関数
     def isSkip(error)
         is_skip = false
 
@@ -150,13 +154,15 @@ class WebClient
     end
 end
 
-query = "プラナス・ガール"
+query = ["チャージマン研", "頭の中にダイナマイト"]
 web_client = WebClient.new
 yahoo_search = YahooSearch.new
 yahoo_search.web_client = web_client
-urlList = yahoo_search.retrieve(query, 5)
+
+urlList = yahoo_search.retrieve(0, query)
 urlList.each { |url| 
     http = web_client.secureOpen(url)
+    # webへのアクセス成功時の動作
     if http != nil
         encoded_contents = NKF.nkf("-w", http.read)
         body = ExtractContent::analyse(encoded_contents)   
@@ -164,16 +170,3 @@ urlList.each { |url|
         puts "======================================================================"
     end
 }
-
-# 以下はネットからソースをダウンロードして，UTF8エンコードして返すプログラム
-# url = "http://www.google.co.jp"
-# contents = open(url).read
-# encodedString = NKF.nkf("-w", contents)
-# puts encodedString
-
-# html = File.open("./sampleHTML/ruby2.html").read
-# opt = {:waste_expressions => /お問い合わせ|会社概要/}
-# ExtractContent::set_default(opt)
-
-# body, title = ExtractContent::analyse(html) # 本文抽出
-# puts body
