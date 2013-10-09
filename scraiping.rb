@@ -8,6 +8,9 @@ require "nkf"
 require "socket"
 
 # TODO:CustomNetClientを作る
+# 既知のバグ
+#   URLがpdfファイルの時，open.readした結果が読めるものではない
+#   retryの部分
 
 # ======================================================================
 # 検索エンジンを表すクラス
@@ -154,7 +157,7 @@ class WebClient
     end
 end
 
-query = ["チャージマン研", "頭の中にダイナマイト"]
+query = ["音声認識", "言語モデル"]
 web_client = WebClient.new
 yahoo_search = YahooSearch.new
 yahoo_search.web_client = web_client
