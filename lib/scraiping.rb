@@ -1,15 +1,39 @@
 #!/usr/bin/ruby
 $KCODE="utf-8"
-# require "extractcontent" 
 require "uri"
 require "open-uri"
 require "nkf"
 require "socket"
 
-# TODO:CustomNetClientを作る
-# 既知のバグ
-#   URLがpdfファイルの時，open.readした結果が読めるものではない
-#   retryの部分
+=begin
+# ======================================================================
+# 【このライブラリの概要】
+#  YahooやGoogleのような検索エンジンを使って，
+#  検索クエリに合ったサイトのURLを取得するためのライブラリ．
+#
+# 【使用例】
+#  query = ["魔法少女まどか☆マギカ"]           # 検索クエリを設定
+#  page_num = 1                                 # 1ページ目(1件 ~ 10件)の検索結果を表示する
+#  web_client = Scraiping::WebClient.new        # ネット上のページにアクセスするオブジェクトを生成
+#  yahoo_search = Scraiping::YahooSearch.new    # Yahooの検索エンジンに該当するオブジェクトを生成
+#  yahoo_search.web_client = web_client         # YahooSearchの内部で，web_clientを用いる
+#  
+#  urlList = yahoo_search.retrieve(0, query)    # クエリとページ数を指定して検索．
+#  p urlList                                    #結果を表示
+#
+#    -> ["http://www.madoka-magica.com/",
+#        "http://ja.wikipedia.org/wiki/%E9%AD%94%E6%B3%95%E5%B0%91%E5%A5%B3%E3%81%BE%E3%81%A9%E3%81%8B%E2%98%86%E3%83%9E%E3%82%AE%E3%82%AB",
+#        "http://mm.my-gg.com/",
+#        "http://www.mbs.jp/madoka-magica/",
+#        "http://madokamagica-game.psvita.bngames.net/",
+#        "http://tvanimedouga.blog93.fc2.com/blog-entry-10154.html",
+#        "https://twitter.com/madoka_magica",
+#        "http://dic.nicovideo.jp/a/%E9%AD%94%E6%B3%95%E5%B0%91%E5%A5%B3%E3%81%BE%E3%81%A9%E3%81%8B%E2%98%86%E3%83%9E%E3%82%AE%E3%82%AB",
+#        "http://madoka-magica-game.channel.or.jp/",
+#        "http://dic.pixiv.net/a/%E9%AD%94%E6%B3%95%E5%B0%91%E5%A5%B3%E3%81%BE%E3%81%A9%E3%81%8B%E2%98%86%E3%83%9E%E3%82%AE%E3%82%AB"]
+# ======================================================================
+=end
+module Scraiping
 
 =begin
 # ======================================================================
@@ -21,27 +45,75 @@ require "socket"
 # ======================================================================
 =end
 class SearchEngine
+    WAIT_RETRIEVE = 3   # 次の検索までの最低待ち時間
 
-    def createUrl(query, pageCount)
+=begin
+    # ======================================================================
+    # 【abstract】
+    #  検索クエリとページ番号から，検索結果のURLを返す
+    #  このクラスを継承したクラスが実装することを期待している．
+    # 【param】
+    #  query      : 検索クエリとなる文字列を要素にもつArray
+    #  page_count : 検索エンジンにおけるページ数．int型
+    # 【return】
+    #  検索結果を表すString.
+    # ======================================================================
+=end
+    def createUrl(query, page_count)
         raise "abstract method is called!"
     end
 
+=begin
+    # ======================================================================
+    # 【abstract】
+    #  検索結果のhtmlソースコードから，アクセスしたいページのURLを抽出する．
+    #  このクラスを継承したクラスが実装することを期待している．
+    # 【param】
+    #  html_source : 検索結果のhtmlソースコード．String
+    # 【return】
+    #  アクセスしたいページのURL(String)を要素にもつArray.
+    # ======================================================================
+=end
     def getUrlList(html_source)
         raise "abstract method is called!"
     end
 
+=begin
+    # ======================================================================
+    # 【abstract】
+    #  フィールド変数 @web_client の setter
+    # 【param】
+    #  value : WebClientクラスのオブジェクト． 
+    # ======================================================================
+=end
     def web_client=(value) 
         if value.instance_of?(WebClient)
             @web_client = value
         end
     end
 
-    # http接続(yahooなど)のみ対応，https(googleなど)は現状非対応
-    def retrieve(pageCount, query)
-        # encoded_query = URI.escape(query)                       # クエリのエンコード
+=begin
+# ======================================================================
+# 【abstract】
+#  検索クエリとページ数から，アクセスしたいURLのリストを返す
+#
+# 【param】
+#  page_count : 検索クエリにおけるページ数.int．
+#  query      : 検索クエリとなる文字列を要素にもつArray.
+#
+# 【return】
+#  result_url_list : アクセスしたいURL(String)を要素に持つArray.
+#
+# 【Note】
+#  http接続(yahooなど)のみ対応，https(googleなど)は現状非対応
+# ======================================================================
+=end
+    def retrieve(page_count, query)
+        # encoded_query = URI.escape(query)                     # クエリのエンコード
         encoded_query = query.map{|each_query| URI.escape(each_query)}
-        search_url = self.createUrl(pageCount, encoded_query)   # 検索エンジン毎に指定したフォーマットでURL作成
-        search_result = @web_client.open(search_url).read # 生成したURLで検索し，結果のHTMLを取得
+        search_url = self.createUrl(page_count, encoded_query)   # 検索エンジン毎に指定したフォーマットでURL作成
+        search_result = @web_client.open(search_url).read       # 生成したURLで検索し，結果のHTMLを取得
+        sleep(WAIT_RETRIEVE)
         result_url_list = self.getUrlList(search_result)        # 検索結果URLから，ヒットしたページのURLを取得
 
         return result_url_list 
@@ -50,11 +122,17 @@ end
 
 # Yahoo検索のためのクラス
 class YahooSearch < SearchEngine
-    def initialize
-        @addressFormat = "http://search.yahoo.co.jp/search?p=%s&aq=-1&ei=UTF-8&pstart=1&fr=top_ga1_sa&b=%s"
-        @targetPattern = /(<h2>ウェブ<\/h2>.*?)$/
-        @searchPattern = /((<\/h2><ol>)|(<\/em><\/li>))<li><a href="(.*?)">/
-    end
+
+    # >>>>>>>>>> クラス定数宣言 <<<<<<<<<<
+    # 検索結果を表すURLのフォーマット．%sの部分には，sprintfによってstring変数が代入される．
+    ADDRESS_FORMAT = "http://search.yahoo.co.jp/search?p=%s&aq=-1&ei=UTF-8&pstart=1&fr=top_ga1_sa&b=%s"
+
+    # 検索結果のURLから，アクセスしたいURLが書かれている部分を大まかに抽出するための正規表現
+    # 範囲を予め限定することで，ゴミが抽出されることを防ぐ
+    TARGET_PATTERN = /(<h2>ウェブ<\/h2>.*?)$/
+
+    # URL抽出するための正規表現
+    SEARCH_PATTERN = /((<\/h2><ol>)|(<\/em><\/li>))<li><a href="(.*?)">/
 
 =begin
     # ======================================================================
@@ -62,17 +140,17 @@ class YahooSearch < SearchEngine
     #  Yahooの検索結果を表すページのURLを作成する関数
     #
     # 【param】
-    #  pageCount : 何ページ目かを表すint型
+    #  page_count : 何ページ目かを表すint型
     #  query     : 検索query．String型を要素に持つArray.
     #
     # 【return】
     #  url       : URLを表す文字列
     # ======================================================================
 =end
-    def createUrl(pageCount, query)
-        page_palamater = (10 * pageCount.to_i) + 1                   # yahooは何番目のページから10個，という表示をする
+    def createUrl(page_count, query)
+        page_palamater = (10 * (page_count-1).to_i) + 1                   # yahooは何番目のページから10個，という表示をする
         query_string = query.join("+")
-        url = sprintf(@addressFormat, query, page_palamater.to_s)
+        url = sprintf(ADDRESS_FORMAT, query, page_palamater.to_s)
         return url
     end
 
@@ -90,23 +168,36 @@ class YahooSearch < SearchEngine
     # ======================================================================
 =end
     def getUrlList(html_source)
-        target_region = html_source.gsub(/\n/, "").scan(@targetPattern).join("+")
-        url_list = target_region.scan(@searchPattern).map{|match| match[3]}
+        target_region = html_source.gsub(/\n/, "").scan(TARGET_PATTERN).join("+")
+        url_list = target_region.scan(SEARCH_PATTERN).map{|match| match[3]}
         return url_list
     end
 end
 
-# 本当は，エラー処理部分は別途クラス化するべき
+=begin
+# ======================================================================
+# 【abstract】
+#  Webのhtmlへのアクセス，及びエラー処理を担当するクラス
+#  ERROR_SKIP_MESSAGE にないエラーは，LIMIT_RETRY回までリトライをする．
+#  ERROR_SKIP_MESSAGE にあるエラーは，リトライせずにスキップする．
+# 【note】
+#  本当は，エラー処理部分は別途クラス化するべき
+# 【TODO】
+#  シングルトン化
+#  スレッド的な感じにして，前回の検索からの秒数で，待ち時間を変える
+# ======================================================================
+=end
 class WebClient
 
-    LIMIT_RETRY = 3
-    WAIT_RETRY = 3
-    WAIT_RETRIEVE = 3
-    ERROR_SKIP_MESSAGE = ["404 Not Found", 
+    # >>>>>>>>>> クラス定数宣言 <<<<<<<<<<
+    LIMIT_RETRY = 0                         # 1URLへのリトライの制限回数
+    WAIT_RETRY = 3                          # リトライするときの待ち時間
+    ERROR_SKIP_MESSAGE = ["404 Not Found",  # リトライせずにスキップするエラー
                           "403 Forbidden"]
 
+    # コンストラクタ．フィールド変数の初期化
     def initialize
-        @continuous_retry_count=0
+        @continuous_retry_count=0           # 1URLの連続リトライ回数
     end
 
 =begin
@@ -190,13 +281,29 @@ class WebClient
         return is_skip
     end
 
+=begin
+    # ======================================================================
+    # 【abstract】
+    # URLが実際にアクセスするに値するかどうかを判定する (URL抽出で発生したゴミかどうかを判定)
+    # これにより，無駄なアクセス，待ち時間の削減が見込める
+    # 【param】
+    #  url : アクセスするURL．String.
+    # 【return】
+    #  有用なURLならtrue, そうでなければfalse.
+    # ======================================================================
+=end
     def isValidURL(url)
+        # 現状，pdfは開けない．
         if url =~ /^http:\/\/rd.listing\.yahoo\.co\.jp\/o\/search\/FOR=/
             return false
-        elsif url =~ /\.pdf(#)*/
+
+        # ~~~.pdf#search=~~~ といったURLがよく抽出されるため
+        elsif url =~ /\.pdf(#)*/    
             return false
         end
 
         return true
     end
 end
+
+end # End of Module "Scraiping"

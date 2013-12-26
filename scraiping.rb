@@ -9,13 +9,14 @@ require "lib/extractcontent.rb"
 #   URLがpdfファイルの時，open.readした結果が読めるものではない
 #   retryの部分
 
-# query = ["魔法少女まどか☆マギカ"]
-query = ["pdf"]
-web_client = WebClient.new
-yahoo_search = YahooSearch.new
+query = ["魔法少女まどか☆マギカ"]
+# query = ["pdf"]
+web_client = Scraiping::WebClient.new
+yahoo_search = Scraiping::YahooSearch.new
 yahoo_search.web_client = web_client
 
-urlList = yahoo_search.retrieve(0, query)
+urlList = yahoo_search.retrieve(1, query)
+p urlList
 urlList.each { |url| 
     puts url
     http = web_client.open(url)
