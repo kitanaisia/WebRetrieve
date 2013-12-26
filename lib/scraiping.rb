@@ -12,14 +12,14 @@ require "socket"
 #  検索クエリに合ったサイトのURLを取得するためのライブラリ．
 #
 # 【使用例】
-#  query = ["魔法少女まどか☆マギカ"]           # 検索クエリを設定
-#  page_num = 1                                 # 1ページ目(1件 ~ 10件)の検索結果を表示する
-#  web_client = Scraiping::WebClient.new        # ネット上のページにアクセスするオブジェクトを生成
-#  yahoo_search = Scraiping::YahooSearch.new    # Yahooの検索エンジンに該当するオブジェクトを生成
-#  yahoo_search.web_client = web_client         # YahooSearchの内部で，web_clientを用いる
+#  query = ["魔法少女まどか☆マギカ"]                   # 検索クエリを設定
+#  page_num = 1                                         # 1ページ目(1件 ~ 10件)の検索結果を表示する
+#  web_client = Scraiping::WebClient.new                # ネット上のページにアクセスするオブジェクトを生成
+#  yahoo_search = Scraiping::YahooSearch.new            # Yahooの検索エンジンに該当するオブジェクトを生成
+#  yahoo_search.web_client = web_client                 # YahooSearchの内部で，web_clientを用いる
 #  
-#  urlList = yahoo_search.retrieve(0, query)    # クエリとページ数を指定して検索．
-#  p urlList                                    #結果を表示
+#  urlList = yahoo_search.retrieve(page_num, query)     # クエリとページ数を指定して検索．
+#  p urlList                                            #結果を表示
 #
 #    -> ["http://www.madoka-magica.com/",
 #        "http://ja.wikipedia.org/wiki/%E9%AD%94%E6%B3%95%E5%B0%91%E5%A5%B3%E3%81%BE%E3%81%A9%E3%81%8B%E2%98%86%E3%83%9E%E3%82%AE%E3%82%AB",
