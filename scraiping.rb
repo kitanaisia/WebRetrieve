@@ -3,6 +3,7 @@ $KCODE="utf-8"
 
 require "lib/scraiping.rb"
 require "lib/extractcontent.rb"
+require "nkf"
 
 # TODO:CustomNetClientを作る
 # 既知のバグ
