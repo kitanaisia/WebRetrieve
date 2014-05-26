@@ -1,0 +1,3 @@
+[submodule "extractcontent"]
+	path = extractcontent
+	url = https://github.com/mono0x/extractcontent

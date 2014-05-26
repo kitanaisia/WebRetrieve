@@ -1,5 +1,6 @@
-#!/usr/bin/ruby
-$KCODE="utf-8"
+#!ruby
+# -*- coding: utf-8 -*-
+
 require "open-uri"  # ネット上のURLのオープンに必要
 require "socket"    # URLオープンのエラー処理に必要
 
@@ -154,7 +155,7 @@ module Scraiping
         def createUrl(page_count, query)
             page_palamater = (10 * (page_count-1).to_i) + 1                   # yahooは何番目のページから10個，という表示をする
             query_string = query.join("+")
-            url = sprintf(ADDRESS_FORMAT, query, page_palamater.to_s)
+            url = sprintf(ADDRESS_FORMAT, query_string, page_palamater.to_s)
             return url
         end
 
