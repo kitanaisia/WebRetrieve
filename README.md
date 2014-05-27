@@ -6,6 +6,10 @@ This project aims to
 
 It works on ruby (version 1.9 or above).
 
-USAGE
+Usage
 =====
 Please see sample.rb and lib/scraiping.rb.
+
+License
+=======
+The BSD License.
