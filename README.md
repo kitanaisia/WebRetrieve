@@ -8,7 +8,10 @@ It works on ruby (version 1.9 or above).
 
 Usage
 =====
-Please see sample.rb and lib/scraiping.rb.
+To retrieve "Natural" and "Language" and "Processing", please run  
+$ ruby sample.rb Natural Language Processing  
+Or  
+$ ruby sample_thread.rb Natural Language Processing  
 
 License
 =======
