@@ -7,7 +7,7 @@ require "nkf"
 require "./retrieveFunc"
 
 # >>>>>>>>>> 検索語を設定 <<<<<<<<<<
-query = ["自然言語処理", "キーワード抽出"]
+query = ARGV
 
 # >>>>>>>>>> 検索エンジンインスタンス初期化 <<<<<<<<<<
 web_client = Scraiping::WebClient.new       # Webアクセスを担当するインスタンスを生成
